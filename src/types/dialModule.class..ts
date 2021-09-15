@@ -5,13 +5,13 @@ export abstract class dialModule {
 
   public code: string;
   public name: string;
-  public disabled? = false;
+  public secondary = false;
 
-  abstract run(): Promise<boolean>
+  abstract run(argument?: number): Promise<void>
 }
 
 export type moduleConfig = {
   code: string;
   name: string;
-  disabled: boolean;
+  secondary: boolean;
 }

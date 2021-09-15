@@ -1,11 +1,14 @@
 import { registermodules } from "./initializers/module.initializers";
 import { App } from "./types/app.class";
 import gpio, { Gpio } from "onoff";
-
-import colors from "colors";
 import app from "./services/app.service";
 import dial from "./events/dial";
+
+import colors from "colors";
 colors.enable();
+
+import env from "dotenv";
+env.config();
 
 export default class Main {
   private app: App;
@@ -16,6 +19,7 @@ export default class Main {
 
     this.initialiseModules();
     this.initialiseGpio();
+    console.log(process.env.HA_URL);
   }
 
   private initialiseModules() {
