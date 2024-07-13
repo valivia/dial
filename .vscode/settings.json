@@ -1,0 +1,15 @@
+{
+  "C_Cpp.intelliSenseEngine": "default",
+  "idf.adapterTargetName": "esp32s3",
+  "idf.openOcdConfigs": [
+    "board/esp32s3-builtin.cfg"
+  ],
+  "idf.flashType": "JTAG",
+  "idf.port": "/dev/ttyACM0",
+  "files.associations": {
+    "*.mdx": "markdown",
+    ".env.local": "env",
+    "stdio.h": "c",
+    "queue.h": "c"
+  }
+}
