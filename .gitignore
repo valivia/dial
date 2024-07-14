@@ -1,2 +1,5 @@
 .devcontainer
 build
+managed_components
+*.old
+env.h

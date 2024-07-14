@@ -1,3 +1,5 @@
+#include "dial.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -9,10 +11,6 @@
 #include "esp_timer.h"
 
 // cycle : ~60-70ms
-
-// Pins
-#define DIAL_DATA_PIN 5
-#define DIAL_MODE_PIN 4
 
 int counter = 0;
 
@@ -65,7 +63,7 @@ void dial_task(void *arg)
     vTaskDelete(NULL);
 }
 
-void configure_dial_gpio()
+void dial_configure_gpio()
 {
     // Configure DIAL_DATA_PIN
     gpio_set_direction(DIAL_DATA_PIN, GPIO_MODE_INPUT);
@@ -77,8 +75,8 @@ void configure_dial_gpio()
     gpio_set_pull_mode(DIAL_MODE_PIN, GPIO_PULLUP_ONLY);
 }
 
-void configure_dial()
+void dial_configure()
 {
-    configure_dial_gpio();
+    dial_configure_gpio();
     xTaskCreatePinnedToCore(dial_task, "dial_task", 4096, NULL, 0, NULL, 0);
 }

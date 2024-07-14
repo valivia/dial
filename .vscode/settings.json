@@ -10,6 +10,11 @@
     "*.mdx": "markdown",
     ".env.local": "env",
     "stdio.h": "c",
-    "queue.h": "c"
+    "queue.h": "c",
+    "cstdint": "cpp",
+    "freertos.h": "c",
+    "esp_log.h": "c",
+    "indicators.h": "c",
+    "string.h": "c"
   }
 }

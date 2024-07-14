@@ -8,8 +8,10 @@
 #include "driver/gpio.h"
 
 // Modules
-#include "./buttons.h"
-#include "./dial.h"
+#include "indicators.h"
+#include "buttons.h"
+#include "dial.h"
+#include "usb.h"
 
 // Speaker
 #define SPEAKER_DATA_PIN 8
@@ -19,12 +21,10 @@
 // Microphone
 #define MIC_DATA_PIN 1
 
-// Indicators
-#define INDICATOR_1_PIN 21
-#define INDICATOR_2_PIN 2
-
 void app_main(void)
 {
-    configure_buttons();
-    configure_dial();
+    indicators_configure();
+    buttons_configure();
+    dial_configure();
+    usb_configure();
 }
