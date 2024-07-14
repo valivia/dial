@@ -8,24 +8,61 @@
 #include "driver/gpio.h"
 #include "esp_timer.h"
 
+// cycle : ~60-70ms
+
 // Pins
 #define DIAL_DATA_PIN 5
 #define DIAL_MODE_PIN 4
 
-// State
-unsigned long last_interrupt_time = 0;
-int dial_counter = 0;
+int counter = 0;
 
-void IRAM_ATTR dial_interrupt_handler(void *arg)
+// Dial
+long int last_dial_time = 0;
+int previous_dial_state = 0;
+
+void dial_task(void *arg)
 {
-    unsigned long interrupt_time = esp_timer_get_time() / 1000;
+    printf("Dial task started\n");
 
-    if (interrupt_time - last_interrupt_time > 30)
+    while (1)
     {
-        dial_counter++;
+        int dial_mode = gpio_get_level(DIAL_MODE_PIN);
+        if (counter != 0 && dial_mode == 1)
+        {
+            printf("====\nDial task finished: %d\n====\n", counter);
+            counter = 0;
+            previous_dial_state = 0;
+            last_dial_time = 0;
+            vTaskDelay(300 / portTICK_PERIOD_MS);
+            continue;
+        }
+
+        if (dial_mode == 1)
+            continue;
+
+        long int current_time = esp_timer_get_time() / 1000;
+
+        int dial_state = gpio_get_level(DIAL_DATA_PIN);
+        if (previous_dial_state == dial_state)
+            continue;
+
+        long int difference = current_time - last_dial_time;
+
+        printf("Dial state changed to: %d, time since last change: %ld", dial_state, current_time - last_dial_time);
+
+        if (dial_state == 1 && previous_dial_state == 0 && (last_dial_time == 0 || difference > 85)) // stricter: (difference > 85 && difference < 135)
+        {
+            counter++;
+            printf(", --Counted-- %d", counter);
+            last_dial_time = current_time;
+        }
+
+        printf("\n");
+
+        previous_dial_state = dial_state;
     }
 
-    last_interrupt_time = interrupt_time;
+    vTaskDelete(NULL);
 }
 
 void configure_dial_gpio()
@@ -38,42 +75,10 @@ void configure_dial_gpio()
     // Configure DIAL_MODE_PIN
     gpio_set_direction(DIAL_MODE_PIN, GPIO_MODE_INPUT);
     gpio_set_pull_mode(DIAL_MODE_PIN, GPIO_PULLUP_ONLY);
-
-    // Interrupts
-    gpio_install_isr_service(0);
-    gpio_isr_handler_add(DIAL_DATA_PIN, dial_interrupt_handler, (void *)DIAL_DATA_PIN);
-    // gpio_isr_handler_add(DIAL_MODE_PIN, dial_interrupt_handler, (void *)DIAL_MODE_PIN);
-}
-
-void dial_task()
-{
-    configure_dial_gpio();
-    esp_intr_dump(NULL);
-
-    while (1)
-    {
-        vTaskDelay(200 / portTICK_PERIOD_MS);
-
-        if (dial_counter == 0)
-            continue;
-
-        // printf("Dial counter: %d ", dial_counter);
-        // printf("Dial mode: %d ", gpio_get_level(DIAL_MODE_PIN));
-        // printf("last interrupt time: %lu\n", last_interrupt_time);
-
-        unsigned long current_time = esp_timer_get_time() / 1000;
-
-        if (current_time - last_interrupt_time > 300)
-        {
-            printf("reset counter at: %d\n", dial_counter);
-            dial_counter = 0;
-        }
-    }
 }
 
 void configure_dial()
 {
-    printf("Data pin: %d\n", DIAL_DATA_PIN);
-    printf("Mode pin: %d\n", DIAL_MODE_PIN);
-    xTaskCreatePinnedToCore(dial_task, "dial_task", 2048, NULL, 0, NULL, 0);
+    configure_dial_gpio();
+    xTaskCreatePinnedToCore(dial_task, "dial_task", 4096, NULL, 0, NULL, 0);
 }
