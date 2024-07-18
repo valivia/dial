@@ -10,6 +10,7 @@
 // Modules
 #include "indicators.h"
 #include "buttons.h"
+#include "touch.h"
 #include "dial.h"
 #include "usb.h"
 
@@ -27,4 +28,5 @@ void app_main(void)
     buttons_configure();
     dial_configure();
     usb_configure();
+    touch_configure();
 }

@@ -1,5 +1,5 @@
 set(srcs
-    "usb.c" "dial.c" "buttons.c" "main.c" "indicators.c"
+    "usb.c" "dial.c" "buttons.c" "main.c" "indicators.c" "touch.c"
 )
 
 set(reqs
