@@ -1,22 +1,30 @@
 #include "dial.h"
 
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <inttypes.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "freertos/queue.h"
 #include "driver/gpio.h"
 #include "esp_timer.h"
+#include "esp_log.h"
+
+static const char *TAG = "dial";
 
 // cycle : ~60-70ms
 
-int counter = 0;
-
 // Dial
+int counter = 0;
 long int last_dial_time = 0;
 int previous_dial_state = 0;
+
+void dial_data_isr(void *arg)
+{
+    long int current_time = esp_timer_get_time() / 1000;
+    long int difference = current_time - last_dial_time;
+    if (last_dial_time == 0 || difference > 85) // stricter: (difference > 85 && difference < 135)
+    {
+        counter++;
+        last_dial_time = current_time;
+    }
+}
 
 void dial_task(void *arg)
 {
@@ -24,40 +32,22 @@ void dial_task(void *arg)
 
     while (1)
     {
-        int dial_mode = gpio_get_level(DIAL_MODE_PIN);
-        if (counter != 0 && dial_mode == 1)
+        if (counter == 0)
         {
-            printf("====\nDial task finished: %d\n====\n", counter);
+            vTaskDelay(500 / portTICK_PERIOD_MS);
+            continue;
+        }
+
+        if (gpio_get_level(DIAL_MODE_PIN) == 1)
+        {
+            ESP_LOGI(TAG, "Dial task finished: %d", counter);
             counter = 0;
             previous_dial_state = 0;
             last_dial_time = 0;
+            // should prob cap the counter to 10 on the output lol
             vTaskDelay(300 / portTICK_PERIOD_MS);
             continue;
         }
-
-        if (dial_mode == 1)
-            continue;
-
-        long int current_time = esp_timer_get_time() / 1000;
-
-        int dial_state = gpio_get_level(DIAL_DATA_PIN);
-        if (previous_dial_state == dial_state)
-            continue;
-
-        long int difference = current_time - last_dial_time;
-
-        printf("Dial state changed to: %d, time since last change: %ld", dial_state, current_time - last_dial_time);
-
-        if (dial_state == 1 && previous_dial_state == 0 && (last_dial_time == 0 || difference > 85)) // stricter: (difference > 85 && difference < 135)
-        {
-            counter++;
-            printf(", --Counted-- %d", counter);
-            last_dial_time = current_time;
-        }
-
-        printf("\n");
-
-        previous_dial_state = dial_state;
     }
 
     vTaskDelete(NULL);
@@ -69,6 +59,8 @@ void dial_configure_gpio()
     gpio_set_direction(DIAL_DATA_PIN, GPIO_MODE_INPUT);
     gpio_set_pull_mode(DIAL_DATA_PIN, GPIO_PULLUP_ONLY);
     gpio_set_intr_type(DIAL_DATA_PIN, GPIO_INTR_POSEDGE);
+    gpio_install_isr_service(0);
+    gpio_isr_handler_add(DIAL_DATA_PIN, dial_data_isr, NULL);
 
     // Configure DIAL_MODE_PIN
     gpio_set_direction(DIAL_MODE_PIN, GPIO_MODE_INPUT);
