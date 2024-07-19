@@ -5,6 +5,8 @@
 
 // Functions
 void usb_configure(void);
-void usb_send_key(uint8_t keycode[6]);
+void usb_press_key(uint8_t keycode);
+void usb_release_key(uint8_t keycode);
+void usb_send_keys();
 
 #endif // USB_H

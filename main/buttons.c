@@ -1,28 +1,17 @@
 #include "buttons.h"
 
-#include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
 #include <inttypes.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "freertos/queue.h"
 #include "driver/gpio.h"
-
 #include "class/hid/hid_device.h"
+
 #include "usb.h"
+#include "state.h"
 
 // State
 int button_index = 0;
-
-// Map of button index to keycodes
-const uint8_t button_keycodes[7][6] = {{HID_KEY_F13},
-                                       {HID_KEY_F14},
-                                       {HID_KEY_F15},
-                                       {HID_KEY_F16},
-                                       {HID_KEY_F17},
-                                       {HID_KEY_F18},
-                                       {HID_KEY_F19}};
 
 void set_demultiplex_channel(int index)
 {
@@ -49,10 +38,17 @@ void buttons_task()
         vTaskDelay(1);
         int button_state = gpio_get_level(BUTTON_SIGNAL_PIN);
 
-        if (button_state == 0)
+        if (button_index > 4)
         {
-            printf("Button %d pressed\n", button_index);
-            usb_send_key(button_keycodes[button_index]);
+            if (button_state == 0)
+            {
+                int change = button_index == 5 ? -1 : 1;
+                change_page_index(change);
+            }
+        }
+        else
+        {
+            receive_button_event(button_index, button_state);
         }
 
         // increase index, max 7

@@ -1,11 +1,5 @@
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <inttypes.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "freertos/queue.h"
-#include "driver/gpio.h"
 
 // Modules
 #include "indicators.h"
@@ -13,6 +7,7 @@
 #include "touch.h"
 #include "dial.h"
 #include "usb.h"
+#include "state.h"
 
 // Speaker
 #define SPEAKER_DATA_PIN 8
@@ -24,6 +19,7 @@
 
 void app_main(void)
 {
+    state_configure();
     indicators_configure();
     buttons_configure();
     dial_configure();

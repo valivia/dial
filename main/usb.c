@@ -73,22 +73,65 @@ void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id, hid_report_type_
 
 /********* Application ***************/
 
-void usb_send_key(uint8_t keycode[6])
+#define MAX_KEYS 6
+
+static uint8_t current_keys[MAX_KEYS] = {0};
+
+void usb_send_keys()
 {
-    ESP_LOGI(TAG, "Received HID key code: %d\n", keycode[0]);
-
-    if (usb_enabled == false)
-        return;
-
-    if (!tud_mounted())
+    if (usb_enabled == false || !tud_mounted())
     {
-        ESP_LOGI(TAG, "USB not mounted\n");
+        ESP_LOGW(TAG, "USB not mounted");
         return;
     }
 
-    tud_hid_keyboard_report(HID_ITF_PROTOCOL_KEYBOARD, 0, keycode);
-    vTaskDelay(pdMS_TO_TICKS(50));
-    tud_hid_keyboard_report(HID_ITF_PROTOCOL_KEYBOARD, 0, NULL);
+    tud_hid_keyboard_report(HID_ITF_PROTOCOL_KEYBOARD, 0, current_keys);
+}
+
+void usb_release_key(uint8_t keycode)
+{
+    bool found = false;
+    for (int i = 0; i < MAX_KEYS; i++)
+    {
+        if (current_keys[i] == keycode)
+        {
+            found = true;
+            current_keys[i] = 0;
+        }
+    }
+
+    if (!found)
+    {
+        ESP_LOGW(TAG, "Failed to release, Key not pressed: %d", keycode);
+        return;
+    }
+
+    ESP_LOGI(TAG, "Key released: %d", keycode);
+    usb_send_keys();
+}
+
+void usb_press_key(uint8_t keycode)
+{
+    for (int i = 0; i < MAX_KEYS; i++)
+    {
+        if (current_keys[i] == keycode)
+        {
+            ESP_LOGW(TAG, "Failed to press, Key already pressed: %d", keycode);
+            return;
+        }
+    }
+
+    for (int i = 0; i < MAX_KEYS; i++)
+    {
+        if (current_keys[i] == 0)
+        {
+            current_keys[i] = keycode;
+            break;
+        }
+    }
+
+    ESP_LOGI(TAG, "Key pressed: %d", keycode);
+    usb_send_keys();
 }
 
 void usb_configure(void)
@@ -96,7 +139,7 @@ void usb_configure(void)
     if (gpio_get_level(DIAL_MODE_PIN) == 0)
     {
         indicators_set_state(1);
-        ESP_LOGI(TAG, "USB not enabled");
+        ESP_LOGW(TAG, "USB not enabled");
         return;
     }
 

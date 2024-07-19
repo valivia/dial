@@ -4,7 +4,7 @@
   "idf.openOcdConfigs": [
     "board/esp32s3-builtin.cfg"
   ],
-  "idf.flashType": "JTAG",
+  "idf.flashType": "UART",
   "idf.port": "/dev/ttyACM0",
   "files.associations": {
     "*.mdx": "markdown",
@@ -15,6 +15,11 @@
     "freertos.h": "c",
     "esp_log.h": "c",
     "indicators.h": "c",
-    "string.h": "c"
+    "string.h": "c",
+    "hid_device.h": "c",
+    "buttons.h": "c",
+    "stdlib.h": "c",
+    "inttypes.h": "c",
+    "stdint.h": "c"
   }
 }
