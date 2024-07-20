@@ -5,6 +5,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "driver/gpio.h"
+#include "esp_timer.h"
 #include "class/hid/hid_device.h"
 
 #include "usb.h"
@@ -12,6 +13,8 @@
 
 // State
 int button_index = 0;
+int next_page_state = 1;
+int previous_page_state = 1;
 
 void set_demultiplex_channel(int index)
 {
@@ -35,17 +38,26 @@ void buttons_task()
     for (;;)
     {
         set_demultiplex_channel(button_index);
-        vTaskDelay(1);
+        vTaskDelay(1 / portTICK_PERIOD_MS);
         int button_state = gpio_get_level(BUTTON_SIGNAL_PIN);
 
-        if (button_index > 4)
+        // page logic if button 5 or 6
+        if (button_index == 5 || button_index == 6)
         {
-            if (button_state == 0)
+            int *pageState = (button_index == 5) ? &previous_page_state : &next_page_state;
+            int direction = (button_index == 5) ? -1 : 1;
+
+            if (button_state != *pageState)
             {
-                int change = button_index == 5 ? -1 : 1;
-                change_page_index(change);
+                *pageState = button_state;
+                if (button_state == 0)
+                {
+                    change_page_index(direction);
+                }
             }
         }
+
+        // Action logic if generic button
         else
         {
             receive_button_event(button_index, button_state);
