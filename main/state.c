@@ -7,6 +7,7 @@
 #include "esp_timer.h"
 
 #include "usb.h"
+#include "mqtt.h"
 
 int state_current_page_index = 0;
 static const char *TAG = "state";
@@ -106,12 +107,26 @@ void keyboard_action(action_t *action, int button_state)
     action->data.last_state = button_state;
 }
 
+void mqtt_action(action_t *action, int button_state)
+{
+    if (button_state == 0 && action->data.last_state == 1)
+    {
+        action->data.last_use = esp_timer_get_time() / 1000;
+        mqtt_publish(action->data.mqtt->topic, "a");
+    }
+
+    action->data.last_state = button_state;
+}
+
 void state_handle_action(action_t *action, int button_state)
 {
     switch (action->type)
     {
     case ACTION_TYPE_KEYBOARD:
         keyboard_action(action, button_state);
+        break;
+    case ACTION_TYPE_MQTT:
+        mqtt_action(action, button_state);
         break;
     default:
         printf("Unknown action type.\n");
@@ -136,31 +151,35 @@ void state_task()
 void state_configure()
 {
     xTaskCreatePinnedToCore(state_task, "state_task", 4096, NULL, 0, NULL, 1);
-    for (int i = 0; i < NUM_PAGES; i++)
+    for (int j = 0; j < ACTIONS_PER_PAGE; j++)
     {
-
-        for (int j = 0; j < ACTIONS_PER_PAGE; j++)
+        pages[0].actions[j].type = ACTION_TYPE_KEYBOARD;
+        pages[0].actions[j].data.keyboard = malloc(sizeof(keyboard_action_t));
+        if (j == 1)
         {
-            pages[i].actions[j].type = ACTION_TYPE_KEYBOARD;
-            pages[i].actions[j].data.keyboard = malloc(sizeof(keyboard_action_t));
-            if (j == 0)
-            {
-                pages[i].actions[j].trigger_type = ACTION_TOGGLE;
-            }
-            else if (j == 1)
-            {
-                pages[i].actions[j].trigger_type = ACTION_HOLD;
-            }
-            else
-            {
-                pages[i].actions[j].trigger_type = ACTION_PRESS;
-            }
-            pages[i].actions[j].timeout = 0;
-            pages[i].actions[j].repeat_while_held = false;
-            pages[i].actions[j].data.last_use = 0;
-            pages[i].actions[j].data.last_state = 1;
-            pages[i].actions[j].data.active = false;
-            pages[i].actions[j].data.keyboard->keycode = button_keycodes[j];
+            pages[0].actions[j].trigger_type = ACTION_HOLD;
         }
+        else
+        {
+            pages[0].actions[j].trigger_type = ACTION_PRESS;
+        }
+        pages[0].actions[j].timeout = 0;
+        pages[0].actions[j].repeat_while_held = false;
+        pages[0].actions[j].data.last_use = 0;
+        pages[0].actions[j].data.last_state = 1;
+        pages[0].actions[j].data.active = false;
+        pages[0].actions[j].data.keyboard->keycode = button_keycodes[j];
+    }
+
+    for (int j = 0; j < ACTIONS_PER_PAGE; j++)
+    {
+        pages[1].actions[j].type = ACTION_TYPE_MQTT;
+        pages[1].actions[j].trigger_type = ACTION_PRESS;
+        pages[1].actions[j].timeout = 0;
+        pages[1].actions[j].repeat_while_held = false;
+        pages[1].actions[j].data.last_use = 0;
+        pages[1].actions[j].data.last_state = 1;
+        pages[1].actions[j].data.mqtt = malloc(sizeof(mqtt_action_t));
+        sprintf(pages[1].actions[j].data.mqtt->topic, "phone/button/btn%d", j);
     }
 }

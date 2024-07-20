@@ -23,10 +23,19 @@ typedef struct
     uint8_t keycode;
 } keyboard_action_t;
 
+typedef struct
+{
+    int min;
+    int max;
+    bool use_dial;
+    char topic[32];
+} mqtt_action_t;
+
 //
 typedef enum
 {
     ACTION_TYPE_KEYBOARD,
+    ACTION_TYPE_MQTT,
 } action_type_t;
 
 typedef struct
@@ -36,6 +45,7 @@ typedef struct
     bool active;
 
     keyboard_action_t *keyboard;
+    mqtt_action_t *mqtt;
 } action_data_t;
 
 typedef struct

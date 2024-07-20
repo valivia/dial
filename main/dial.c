@@ -45,6 +45,8 @@ void dial_task(void *arg)
             previous_dial_state = 0;
             last_dial_time = 0;
             // should prob cap the counter to 10 on the output lol
+
+            // dont think this works reliably rn
             vTaskDelay(300 / portTICK_PERIOD_MS);
             continue;
         }
