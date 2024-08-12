@@ -45,11 +45,11 @@ void buttons_task()
         // page logic if button 5 or 6
         if (button_index == 5 || button_index == 6)
         {
-            int *pageState = (button_index == 5) ? &previous_page_state : &next_page_state;
+            int *page_state = (button_index == 5) ? &previous_page_state : &next_page_state;
 
-            if (button_state != *pageState)
+            if (button_state != *page_state)
             {
-                *pageState = button_state;
+                *page_state = button_state;
                 if (button_state == 0)
                 {
                     int direction = (button_index == 5) ? -1 : 1;

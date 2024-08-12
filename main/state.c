@@ -129,9 +129,9 @@ void mqtt_action(action_t *action, int button_state)
             }
             else
             {
-                int OldRange = (10 - 1);
-                int NewRange = (action->data.mqtt->max - action->data.mqtt->min);
-                int value = (((dial - 1) * NewRange) / OldRange) + action->data.mqtt->min;
+                int old_range = (10 - 1);
+                int new_range = (action->data.mqtt->max - action->data.mqtt->min);
+                int value = (((dial - 1) * new_range) / old_range) + action->data.mqtt->min;
                 char value_str[12];
                 sprintf(value_str, "%d", value);
                 mqtt_publish(action->data.mqtt->topic, value_str);
