@@ -10,5 +10,6 @@
 void dial_interrupt_handler(void *arg);
 void dial_configure_gpio();
 void dial_configure();
+int dial_get_count();
 
 #endif // DIAL_H

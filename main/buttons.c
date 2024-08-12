@@ -10,6 +10,7 @@
 
 #include "usb.h"
 #include "state.h"
+#include "indicators.h"
 
 // State
 int button_index = 0;
@@ -45,14 +46,17 @@ void buttons_task()
         if (button_index == 5 || button_index == 6)
         {
             int *pageState = (button_index == 5) ? &previous_page_state : &next_page_state;
-            int direction = (button_index == 5) ? -1 : 1;
 
             if (button_state != *pageState)
             {
                 *pageState = button_state;
                 if (button_state == 0)
                 {
+                    int direction = (button_index == 5) ? -1 : 1;
+                    int indicator = (button_index == 5) ? 0 : 1;
+
                     change_page_index(direction);
+                    indicators_activate(indicator, 200);
                 }
             }
         }

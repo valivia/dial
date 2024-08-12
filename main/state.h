@@ -27,7 +27,7 @@ typedef struct
 {
     int min;
     int max;
-    bool use_dial;
+    bool optional_dial;
     char topic[32];
 } mqtt_action_t;
 

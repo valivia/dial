@@ -122,7 +122,8 @@ void usb_configure(void)
 {
     if (!CONFIG_ESP_USB_ACTIVE || gpio_get_level(DIAL_MODE_PIN) == 0)
     {
-        indicators_set_state(1);
+        indicators_activate(0, 500);
+        indicators_activate(1, 500);
         ESP_LOGW(TAG, "USB not enabled");
         return;
     }

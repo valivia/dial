@@ -8,6 +8,7 @@
 // Functions
 void indicators_configure_gpio();
 void indicators_configure();
-void indicators_set_state(int state);
+void indicators_activate(int indicator, long int time_ms);
+void indicators_deactivate(int indicator);
 
-#endif //INDICATORS_H
+#endif // INDICATORS_H

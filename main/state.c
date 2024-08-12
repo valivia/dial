@@ -8,6 +8,7 @@
 
 #include "usb.h"
 #include "mqtt.h"
+#include "dial.h"
 
 int state_current_page_index = 0;
 static const char *TAG = "state";
@@ -112,7 +113,34 @@ void mqtt_action(action_t *action, int button_state)
     if (button_state == 0 && action->data.last_state == 1)
     {
         action->data.last_use = esp_timer_get_time() / 1000;
-        mqtt_publish(action->data.mqtt->topic, "a");
+        if (action->data.mqtt->min != -1 && action->data.mqtt->max != -1)
+        {
+            int dial = dial_get_count();
+            if (dial == 0)
+            {
+                if (action->data.mqtt->optional_dial)
+                {
+                    mqtt_publish(action->data.mqtt->topic, "");
+                }
+                else
+                {
+                    ESP_LOGW(TAG, "Dial is required for this action.");
+                }
+            }
+            else
+            {
+                int OldRange = (10 - 1);
+                int NewRange = (action->data.mqtt->max - action->data.mqtt->min);
+                int value = (((dial - 1) * NewRange) / OldRange) + action->data.mqtt->min;
+                char value_str[12];
+                sprintf(value_str, "%d", value);
+                mqtt_publish(action->data.mqtt->topic, value_str);
+            }
+        }
+        else
+        {
+            mqtt_publish(action->data.mqtt->topic, "");
+        }
     }
 
     action->data.last_state = button_state;
@@ -129,7 +157,7 @@ void state_handle_action(action_t *action, int button_state)
         mqtt_action(action, button_state);
         break;
     default:
-        printf("Unknown action type.\n");
+        ESP_LOGE(TAG, "Unknown action type.");
         break;
     }
 }
@@ -181,5 +209,8 @@ void state_configure()
         pages[1].actions[j].data.last_state = 1;
         pages[1].actions[j].data.mqtt = malloc(sizeof(mqtt_action_t));
         sprintf(pages[1].actions[j].data.mqtt->topic, "phone/button/btn%d", j);
+        pages[1].actions[j].data.mqtt->min = 10;
+        pages[1].actions[j].data.mqtt->max = 100;
+        pages[1].actions[j].data.mqtt->optional_dial = true;
     }
 }

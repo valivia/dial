@@ -6,14 +6,21 @@
 #include "esp_timer.h"
 #include "esp_log.h"
 
+#include "indicators.h"
+
 static const char *TAG = "dial";
 
 // cycle : ~60-70ms
+
+const long int counter_timeout = 5000;
 
 // Dial
 int counter = 0;
 long int last_dial_time = 0;
 int previous_dial_state = 0;
+
+int last_count = 0;
+long int last_count_time = 0;
 
 void dial_data_isr(void *arg)
 {
@@ -28,10 +35,17 @@ void dial_data_isr(void *arg)
 
 void dial_task(void *arg)
 {
-    printf("Dial task started\n");
+    ESP_LOGI(TAG, "Task started");
 
     while (1)
     {
+        if (last_count != 0 && last_count_time != 0 && (esp_timer_get_time() / 1000) - last_count_time > counter_timeout)
+        {
+            ESP_LOGI(TAG, "Dial count expired");
+            last_count = 0;
+            last_count_time = 0;
+        }
+
         if (counter == 0)
         {
             vTaskDelay(500 / portTICK_PERIOD_MS);
@@ -40,11 +54,18 @@ void dial_task(void *arg)
 
         if (gpio_get_level(DIAL_MODE_PIN) == 1)
         {
-            ESP_LOGI(TAG, "Dial task finished: %d", counter);
+            if (counter > 10) {
+                counter = 10;
+            }
+
+            last_count = counter;
+            last_count_time = esp_timer_get_time() / 1000;
+
+            ESP_LOGI(TAG, "Dial count: %d", counter);
+            indicators_activate(0, counter_timeout);
             counter = 0;
             previous_dial_state = 0;
             last_dial_time = 0;
-            // should prob cap the counter to 10 on the output lol
 
             // dont think this works reliably rn
             vTaskDelay(300 / portTICK_PERIOD_MS);
@@ -53,6 +74,18 @@ void dial_task(void *arg)
     }
 
     vTaskDelete(NULL);
+}
+
+int dial_get_count()
+{
+    if (last_count == 0)
+        return 0;
+    
+    indicators_deactivate(0);
+    int response = last_count;
+    last_count = 0;
+    last_dial_time = 0;
+    return response;
 }
 
 void dial_configure_gpio()
