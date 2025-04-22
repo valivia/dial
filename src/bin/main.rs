@@ -4,13 +4,17 @@
 use defmt::info;
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
-use esp_hal::timer::systimer::SystemTimer;
+use esp_hal::clock::CpuClock;
+use esp_hal::rng::Rng;
 use esp_hal::timer::timg::TimerGroup;
-use esp_hal::{clock::CpuClock, gpio::Io};
 use esp_println as _;
-use modules::buttons::{self, ButtonServiceGpio};
-use modules::dial::{DialService, DialServiceGpio};
-use modules::interrupt::handler;
+use modules::buttons::button_task;
+use modules::buttons::service::ButtonServiceGpio;
+use modules::dial::{dial_task, DialServiceGpio};
+use modules::indicator::{IndicatorService, IndicatorServiceGpio};
+use modules::mqtt::mqtt_init;
+use modules::state::state_task;
+use modules::wifi::wifi_init;
 
 #[panic_handler]
 fn panic(_: &core::panic::PanicInfo) -> ! {
@@ -19,8 +23,8 @@ fn panic(_: &core::panic::PanicInfo) -> ! {
 
 extern crate alloc;
 
-pub mod modules;
 pub mod actions;
+pub mod modules;
 
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) {
@@ -29,25 +33,22 @@ async fn main(spawner: Spawner) {
 
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
-    let timer0 = SystemTimer::new(peripherals.SYSTIMER);
-    esp_hal_embassy::init(timer0.alarm0);
+    let timg1 = TimerGroup::new(peripherals.TIMG1);
+    esp_hal_embassy::init(timg1.timer0);
+
+    let rng = Rng::new(peripherals.RNG);
 
     info!("Embassy initialized!");
 
-    let timer1 = TimerGroup::new(peripherals.TIMG0);
-    let _init = esp_wifi::init(
-        timer1.timer0,
-        esp_hal::rng::Rng::new(peripherals.RNG),
-        peripherals.RADIO_CLK,
-    )
-    .unwrap();
+    // let mut io = Io::new(peripherals.IO_MUX);
+    // io.set_interrupt_handler(handler);
 
-    let mut io = Io::new(peripherals.IO_MUX);
-    io.set_interrupt_handler(handler);
+    // State
+    spawner.spawn(state_task()).unwrap();
 
     // Buttons
     spawner
-        .spawn(buttons::run(ButtonServiceGpio {
+        .spawn(button_task(ButtonServiceGpio {
             data: peripherals.GPIO34.into(),
             select_1: peripherals.GPIO36.into(),
             select_2: peripherals.GPIO37.into(),
@@ -56,12 +57,43 @@ async fn main(spawner: Spawner) {
         .unwrap();
 
     // Dial
-    DialService::new(DialServiceGpio {
-        data: peripherals.GPIO5.into(),
-        mode: peripherals.GPIO4.into(),
+    spawner
+        .spawn(dial_task(DialServiceGpio {
+            data: peripherals.GPIO5.into(),
+            mode: peripherals.GPIO4.into(),
+        }))
+        .unwrap();
+
+    // Indicators
+    let mut indicators = IndicatorService::new(IndicatorServiceGpio {
+        left: peripherals.GPIO21.into(),
+        right: peripherals.GPIO2.into(),
     });
 
-    loop {
-        Timer::after(Duration::from_secs(1)).await;
-    }
+    indicators.set_right(true);
+    indicators.set_left(true);
+    Timer::after(Duration::from_secs(1)).await;
+    indicators.set_right(false);
+    indicators.set_left(false);
+
+    // Wifi
+    let wifi_stack = wifi_init(
+        spawner,
+        peripherals.TIMG0,
+        peripherals.RADIO_CLK,
+        peripherals.WIFI,
+        rng.clone(),
+    )
+    .await;
+
+    spawner.spawn(mqtt_init(wifi_stack)).ok();
+
+    // loop {
+    //     indicators.set_right(false);
+    //     indicators.set_left(true);
+    //     Timer::after(Duration::from_secs(1)).await;
+    //     indicators.set_left(false);
+    //     indicators.set_right(true);
+    //     Timer::after(Duration::from_secs(1)).await;
+    // }
 }

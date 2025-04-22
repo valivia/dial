@@ -1,0 +1,85 @@
+use core::str::FromStr;
+
+use defmt::{info, warn};
+use heapless::String;
+
+use crate::actions::{mqtt, usb, Action, PAGES};
+
+use super::{
+    buttons::{Button, ButtonState, BUTTON_SIGNAL},
+    mqtt::MQTT_SIGNAL,
+};
+
+#[embassy_executor::task]
+pub async fn state_task() {
+    let mut state_manager = StateManager::new();
+    info!("State manager initialized");
+
+    loop {
+        let (button, state) = BUTTON_SIGNAL.wait().await;
+        state_manager.handle_signal(button, state);
+    }
+}
+
+pub struct StateManager {
+    // Index of PAGES (static sized array)
+    current_page_index: usize,
+}
+
+impl StateManager {
+    pub fn new() -> Self {
+        Self {
+            current_page_index: 0,
+        }
+    }
+
+    pub fn handle_signal(&mut self, button: Button, state: ButtonState) {
+        match button {
+            Button::PageRight | Button::PageLeft => self.handle_page_event(button, state),
+            _ => self.handle_button_event(button, state),
+        }
+    }
+
+    fn handle_page_event(&mut self, button: Button, state: ButtonState) {
+        if state != ButtonState::Pressed {
+            return;
+        }
+
+        let page_count = PAGES.len();
+        self.current_page_index = match button {
+            Button::PageRight => (self.current_page_index + 1) % page_count,
+            Button::PageLeft => (self.current_page_index + page_count - 1) % page_count,
+            _ => {
+                warn!("Ignored non-page button: {:?}", button);
+                return;
+            }
+        };
+
+        info!("Page changed to {}", self.current_page_index);
+    }
+
+    fn handle_button_event(&mut self, button: Button, state: ButtonState) {
+        let page = &PAGES[self.current_page_index];
+        let action = &page.actions[button.to_index()];
+
+        match action {
+            Action::Mqtt(mqtt_action) => self.run_mqtt_action(mqtt_action, state),
+            Action::Usb(usb_action) => self.run_usb_action(usb_action),
+        }
+    }
+
+    fn run_mqtt_action(&self, action: &mqtt::Action, state: ButtonState) {
+        if state != ButtonState::Pressed {
+            return;
+        }
+
+        MQTT_SIGNAL.signal((
+            String::<32>::from_str(action.topic).unwrap(),
+            String::from_str("").unwrap(),
+        ));
+    }
+
+    fn run_usb_action(&self, action: &usb::Action) {
+        info!("Running USB action: {:?}", action.keycode);
+    }
+}

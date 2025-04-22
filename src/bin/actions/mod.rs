@@ -10,7 +10,7 @@ pub struct Page {
     pub actions: [Action; 5],
 }
 
-static PAGES: [Page; 2] = [
+pub static PAGES: [Page; 2] = [
     Page {
         actions: [
             Action::Mqtt(mqtt::Action::new("phone/button/btn0")),
