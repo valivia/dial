@@ -6,9 +6,7 @@ use heapless::String;
 use crate::actions::{mqtt, usb, Action, PAGES};
 
 use super::{
-    buttons::{Button, ButtonState, BUTTON_SIGNAL},
-    dial::LAST_DIAL_COUNT,
-    mqtt::MQTT_SIGNAL,
+    buttons::{Button, ButtonState, BUTTON_SIGNAL}, dial::LAST_DIAL_COUNT, indicator::CANCEL_INDICATION, mqtt::MQTT_SIGNAL
 };
 
 #[embassy_executor::task]
@@ -85,6 +83,7 @@ impl StateManager {
 
         // Reset the dial count
         LAST_DIAL_COUNT.store(None);
+        CANCEL_INDICATION.signal(());
 
         MQTT_SIGNAL.signal((String::<32>::from_str(action.topic).unwrap(), payload));
     }

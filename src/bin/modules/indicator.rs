@@ -1,41 +1,77 @@
-use core::cell::RefCell;
-
-use critical_section::Mutex;
+use embassy_futures::select::{select, Either};
+use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
+use embassy_time::{Duration, Timer};
 use esp_hal::gpio::{AnyPin, Level, Output, OutputConfig};
 
-pub static INDICATOR_SERVICE: Mutex<RefCell<Option<IndicatorService>>> =
-    Mutex::new(RefCell::new(None));
-
-pub struct IndicatorServiceGpio {
-    pub left: AnyPin,
-    pub right: AnyPin,
+pub struct LoopingIndication {
+    pub time_on: Duration,
+    pub time_off: Duration,
+    pub count: u8,
 }
 
-pub struct IndicatorService<'a> {
-    left_indicator: Output<'a>,
-    right_indicator: Output<'a>,
+pub enum Indication {
+    SingleFire(Duration),
+    Looping(LoopingIndication),
+    None,
 }
 
-impl<'a> IndicatorService<'a> {
-    pub fn new(pins: IndicatorServiceGpio) -> Self {
-        let config = OutputConfig::default();
+pub struct IndicatorAction {
+    pub left: Indication,
+    pub right: Indication,
+}
 
-        let left_indicator = Output::new(pins.left, Level::Low, config);
-        let right_indicator = Output::new(pins.right, Level::Low, config);
+pub static CURRENT_INDICATION: Signal<CriticalSectionRawMutex, IndicatorAction> = Signal::new();
+pub static CANCEL_INDICATION: Signal<CriticalSectionRawMutex, ()> = Signal::new();
 
-        Self {
-            left_indicator,
-            right_indicator,
+#[embassy_executor::task]
+pub async fn indicator_task(left: AnyPin, right: AnyPin) {
+    let config = OutputConfig::default();
+
+    let mut left_indicator = Output::new(left, Level::Low, config);
+    let mut right_indicator = Output::new(right, Level::Low, config);
+
+    loop {
+        let action = CURRENT_INDICATION.wait().await;
+
+        // Spawn two concurrent tasks to handle left and right independently.
+        embassy_futures::join::join(
+            handle_indication(&mut left_indicator, &action.left),
+            handle_indication(&mut right_indicator, &action.right),
+        )
+        .await;
+
+        CURRENT_INDICATION.reset();
+    }
+}
+
+/// Handles a single pin's indication pattern.
+async fn handle_indication(pin: &mut Output<'_>, indication: &Indication) {
+    match indication {
+        Indication::None => {
+            pin.set_low();
         }
-    }
+        Indication::SingleFire(duration) => {
+            pin.set_high();
+            let _ = select(Timer::after(*duration), CANCEL_INDICATION.wait()).await;
+            pin.set_low();
+        }
+        Indication::Looping(looping) => {
+            for _ in 0..looping.count {
+                pin.set_high();
+                if let Either::Second(_) =
+                    select(Timer::after(looping.time_on), CANCEL_INDICATION.wait()).await
+                {
+                    pin.set_low();
+                    return;
+                }
 
-    pub fn set_left(&mut self, state: bool) {
-        let level = if state { Level::High } else { Level::Low };
-        self.left_indicator.set_level(level);
-    }
-
-    pub fn set_right(&mut self, state: bool) {
-        let level = if state { Level::High } else { Level::Low };
-        self.right_indicator.set_level(level);
+                pin.set_low();
+                if let Either::Second(_) =
+                    select(Timer::after(looping.time_off), CANCEL_INDICATION.wait()).await
+                {
+                    return;
+                }
+            }
+        }
     }
 }

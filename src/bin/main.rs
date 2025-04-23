@@ -3,7 +3,7 @@
 
 use defmt::info;
 use embassy_executor::Spawner;
-use embassy_time::{Duration, Timer};
+use embassy_time::Duration;
 use esp_hal::clock::CpuClock;
 use esp_hal::rng::Rng;
 use esp_hal::timer::timg::TimerGroup;
@@ -11,7 +11,7 @@ use esp_println as _;
 use modules::buttons::button_task;
 use modules::buttons::service::ButtonServiceGpio;
 use modules::dial::dial_task;
-use modules::indicator::{IndicatorService, IndicatorServiceGpio};
+use modules::indicator::{indicator_task, Indication, IndicatorAction, CURRENT_INDICATION};
 use modules::mqtt::mqtt_init;
 use modules::state::state_task;
 use modules::wifi::wifi_init;
@@ -40,9 +40,6 @@ async fn main(spawner: Spawner) {
 
     info!("Embassy initialized!");
 
-    // let mut io = Io::new(peripherals.IO_MUX);
-    // io.set_interrupt_handler(handler);
-
     // State
     spawner.spawn(state_task()).unwrap();
 
@@ -65,16 +62,17 @@ async fn main(spawner: Spawner) {
         .unwrap();
 
     // Indicators
-    let mut indicators = IndicatorService::new(IndicatorServiceGpio {
-        left: peripherals.GPIO21.into(),
-        right: peripherals.GPIO2.into(),
-    });
+    spawner
+        .spawn(indicator_task(
+            peripherals.GPIO21.into(),
+            peripherals.GPIO2.into(),
+        ))
+        .unwrap();
 
-    indicators.set_right(true);
-    indicators.set_left(true);
-    Timer::after(Duration::from_secs(1)).await;
-    indicators.set_right(false);
-    indicators.set_left(false);
+    CURRENT_INDICATION.signal(IndicatorAction {
+        left: Indication::SingleFire(Duration::from_secs(1)),
+        right: Indication::SingleFire(Duration::from_secs(1)),
+    });
 
     // Wifi
     let wifi_stack = wifi_init(
@@ -86,14 +84,6 @@ async fn main(spawner: Spawner) {
     )
     .await;
 
+    // MQTT
     spawner.spawn(mqtt_init(wifi_stack)).ok();
-
-    // loop {
-    //     indicators.set_right(false);
-    //     indicators.set_left(true);
-    //     Timer::after(Duration::from_secs(1)).await;
-    //     indicators.set_left(false);
-    //     indicators.set_right(true);
-    //     Timer::after(Duration::from_secs(1)).await;
-    // }
 }
