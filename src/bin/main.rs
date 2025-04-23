@@ -11,7 +11,7 @@ use esp_println as _;
 use modules::buttons::button_task;
 use modules::buttons::service::ButtonServiceGpio;
 use modules::dial::dial_task;
-use modules::indicator::{indicator_task, Indication, IndicatorAction, CURRENT_INDICATION};
+use modules::indicator::{indicator_task, set_indication, Indication, IndicatorAction};
 use modules::mqtt::mqtt_init;
 use modules::state::state_task;
 use modules::wifi::wifi_init;
@@ -69,7 +69,7 @@ async fn main(spawner: Spawner) {
         ))
         .unwrap();
 
-    CURRENT_INDICATION.signal(IndicatorAction {
+    set_indication(IndicatorAction {
         left: Indication::SingleFire(Duration::from_secs(1)),
         right: Indication::SingleFire(Duration::from_secs(1)),
     });

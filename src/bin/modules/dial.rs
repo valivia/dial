@@ -5,7 +5,7 @@ use embassy_futures::select::{select, Either};
 use embassy_time::{with_timeout, Duration, Instant, Timer};
 use esp_hal::gpio::{AnyPin, Event, Input, Pull};
 
-use crate::modules::indicator::{Indication, IndicatorAction, CURRENT_INDICATION};
+use crate::modules::indicator::{set_indication, Indication, IndicatorAction};
 
 use super::util::OptionalAtomicU8;
 
@@ -93,7 +93,7 @@ impl<'a> DialService<'a> {
             let now = Instant::now().as_secs() as u32;
 
             LAST_DIAL_COUNT_TIME.store(now, Ordering::SeqCst);
-            CURRENT_INDICATION.signal(IndicatorAction {
+            set_indication(IndicatorAction {
                 left: Indication::SingleFire(KEEP_COUNT_DURATION),
                 right: Indication::None,
             });

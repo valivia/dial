@@ -20,7 +20,7 @@ pub struct IndicatorAction {
     pub right: Indication,
 }
 
-pub static CURRENT_INDICATION: Signal<CriticalSectionRawMutex, IndicatorAction> = Signal::new();
+static CURRENT_INDICATION: Signal<CriticalSectionRawMutex, IndicatorAction> = Signal::new();
 pub static CANCEL_INDICATION: Signal<CriticalSectionRawMutex, ()> = Signal::new();
 
 #[embassy_executor::task]
@@ -32,6 +32,7 @@ pub async fn indicator_task(left: AnyPin, right: AnyPin) {
 
     loop {
         let action = CURRENT_INDICATION.wait().await;
+        CANCEL_INDICATION.reset();
 
         // Spawn two concurrent tasks to handle left and right independently.
         embassy_futures::join::join(
@@ -40,8 +41,13 @@ pub async fn indicator_task(left: AnyPin, right: AnyPin) {
         )
         .await;
 
-        CURRENT_INDICATION.reset();
+        Timer::after(Duration::from_millis(500)).await;
     }
+}
+
+pub fn set_indication(action: IndicatorAction) {
+    CANCEL_INDICATION.signal(());
+    CURRENT_INDICATION.signal(action);
 }
 
 /// Handles a single pin's indication pattern.
