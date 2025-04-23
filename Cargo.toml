@@ -1,7 +1,8 @@
 [package]
 edition = "2021"
-name = "Dial"
-version = "0.1.0"
+name = "dial"
+authors = ["Owlive"]
+version = "1.0.0"
 
 [[bin]]
 name = "dial"

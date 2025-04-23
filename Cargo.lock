@@ -3,30 +3,6 @@
 version = 4
 
 [[package]]
-name = "Dial"
-version = "0.1.0"
-dependencies = [
- "critical-section",
- "defmt 0.3.100",
- "embassy-executor",
- "embassy-futures",
- "embassy-net",
- "embassy-sync",
- "embassy-time",
- "embedded-io",
- "embedded-io-async",
- "esp-alloc",
- "esp-hal",
- "esp-hal-embassy",
- "esp-println",
- "esp-wifi",
- "heapless",
- "rust-mqtt",
- "smoltcp",
- "static_cell",
-]
-
-[[package]]
 name = "anyhow"
 version = "1.0.98"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -211,6 +187,30 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "dial"
+version = "1.0.0"
+dependencies = [
+ "critical-section",
+ "defmt 0.3.100",
+ "embassy-executor",
+ "embassy-futures",
+ "embassy-net",
+ "embassy-sync",
+ "embassy-time",
+ "embedded-io",
+ "embedded-io-async",
+ "esp-alloc",
+ "esp-hal",
+ "esp-hal-embassy",
+ "esp-println",
+ "esp-wifi",
+ "heapless",
+ "rust-mqtt",
+ "smoltcp",
+ "static_cell",
 ]
 
 [[package]]
