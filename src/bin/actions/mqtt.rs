@@ -8,10 +8,16 @@ pub struct Action {
 impl Action {
     pub const fn new(topic: &'static str) -> Self {
         Self {
-            min: 0,
+            min: 10,
             max: 100,
             dial_required: false,
             topic,
         }
+    }
+
+    pub fn map_value(&self, value: u8) -> u8 {
+        let range = self.max - self.min;
+        let mapped_value = ((value as u32 * range) / 10) + self.min;
+        mapped_value as u8
     }
 }

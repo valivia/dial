@@ -10,7 +10,7 @@ use esp_hal::timer::timg::TimerGroup;
 use esp_println as _;
 use modules::buttons::button_task;
 use modules::buttons::service::ButtonServiceGpio;
-use modules::dial::{dial_task, DialServiceGpio};
+use modules::dial::dial_task;
 use modules::indicator::{IndicatorService, IndicatorServiceGpio};
 use modules::mqtt::mqtt_init;
 use modules::state::state_task;
@@ -58,10 +58,10 @@ async fn main(spawner: Spawner) {
 
     // Dial
     spawner
-        .spawn(dial_task(DialServiceGpio {
-            data: peripherals.GPIO5.into(),
-            mode: peripherals.GPIO4.into(),
-        }))
+        .spawn(dial_task(
+            peripherals.GPIO4.into(),
+            peripherals.GPIO5.into(),
+        ))
         .unwrap();
 
     // Indicators

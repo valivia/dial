@@ -17,7 +17,12 @@ pub static PAGES: [Page; 2] = [
             Action::Mqtt(mqtt::Action::new("phone/button/btn1")),
             Action::Mqtt(mqtt::Action::new("phone/button/btn2")),
             Action::Mqtt(mqtt::Action::new("phone/button/btn3")),
-            Action::Mqtt(mqtt::Action::new("phone/button/btn4")),
+            Action::Mqtt(mqtt::Action {
+                min: 0,
+                max: 10,
+                dial_required: false,
+                topic: "phone/button/btn4",
+            }),
         ],
     },
     Page {

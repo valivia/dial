@@ -9,6 +9,7 @@ dependencies = [
  "critical-section",
  "defmt 0.3.100",
  "embassy-executor",
+ "embassy-futures",
  "embassy-net",
  "embassy-sync",
  "embassy-time",

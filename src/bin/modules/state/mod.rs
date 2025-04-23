@@ -1,5 +1,5 @@
+use core::fmt::Write;
 use core::str::FromStr;
-
 use defmt::{info, warn};
 use heapless::String;
 
@@ -7,6 +7,7 @@ use crate::actions::{mqtt, usb, Action, PAGES};
 
 use super::{
     buttons::{Button, ButtonState, BUTTON_SIGNAL},
+    dial::LAST_DIAL_COUNT,
     mqtt::MQTT_SIGNAL,
 };
 
@@ -73,10 +74,19 @@ impl StateManager {
             return;
         }
 
-        MQTT_SIGNAL.signal((
-            String::<32>::from_str(action.topic).unwrap(),
-            String::from_str("").unwrap(),
-        ));
+        let payload = match LAST_DIAL_COUNT.load() {
+            Some(count) => {
+                let mut s = String::<32>::new();
+                write!(s, "{}", action.map_value(count)).unwrap();
+                s
+            }
+            None => String::from_str("").unwrap(),
+        };
+
+        // Reset the dial count
+        LAST_DIAL_COUNT.store(None);
+
+        MQTT_SIGNAL.signal((String::<32>::from_str(action.topic).unwrap(), payload));
     }
 
     fn run_usb_action(&self, action: &usb::Action) {
