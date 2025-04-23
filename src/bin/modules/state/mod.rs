@@ -1,12 +1,19 @@
 use core::fmt::Write;
 use core::str::FromStr;
 use defmt::{info, warn};
+use embassy_time::Duration;
 use heapless::String;
 
-use crate::actions::{mqtt, usb, Action, PAGES};
+use crate::{
+    actions::{mqtt, usb, Action, PAGES},
+    modules::indicator::{set_indication, IndicatorAction},
+};
 
 use super::{
-    buttons::{Button, ButtonState, BUTTON_SIGNAL}, dial::LAST_DIAL_COUNT, indicator::CANCEL_INDICATION, mqtt::MQTT_SIGNAL
+    buttons::{Button, ButtonState, BUTTON_SIGNAL},
+    dial::LAST_DIAL_COUNT,
+    indicator::CANCEL_INDICATION,
+    mqtt::MQTT_SIGNAL,
 };
 
 #[embassy_executor::task]
@@ -19,6 +26,8 @@ pub async fn state_task() {
         state_manager.handle_signal(button, state);
     }
 }
+
+static PAGE_CHANGE_SIGNAL_DURATION: Duration = Duration::from_millis(200);
 
 pub struct StateManager {
     // Index of PAGES (static sized array)
@@ -46,8 +55,20 @@ impl StateManager {
 
         let page_count = PAGES.len();
         self.current_page_index = match button {
-            Button::PageRight => (self.current_page_index + 1) % page_count,
-            Button::PageLeft => (self.current_page_index + page_count - 1) % page_count,
+            Button::PageRight => {
+                set_indication(IndicatorAction::single_fire(
+                    None,
+                    Some(PAGE_CHANGE_SIGNAL_DURATION),
+                ));
+                (self.current_page_index + 1) % page_count
+            }
+            Button::PageLeft => {
+                set_indication(IndicatorAction::single_fire(
+                    Some(PAGE_CHANGE_SIGNAL_DURATION),
+                    None,
+                ));
+                (self.current_page_index + page_count - 1) % page_count
+            }
             _ => {
                 warn!("Ignored non-page button: {:?}", button);
                 return;

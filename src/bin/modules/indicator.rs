@@ -20,6 +20,15 @@ pub struct IndicatorAction {
     pub right: Indication,
 }
 
+impl IndicatorAction {
+    pub fn single_fire(left: Option<Duration>, right: Option<Duration>) -> Self {
+        Self {
+            left: left.map_or(Indication::None, Indication::SingleFire),
+            right: right.map_or(Indication::None, Indication::SingleFire),
+        }
+    }
+}
+
 static CURRENT_INDICATION: Signal<CriticalSectionRawMutex, IndicatorAction> = Signal::new();
 pub static CANCEL_INDICATION: Signal<CriticalSectionRawMutex, ()> = Signal::new();
 
@@ -40,8 +49,6 @@ pub async fn indicator_task(left: AnyPin, right: AnyPin) {
             handle_indication(&mut right_indicator, &action.right),
         )
         .await;
-
-        Timer::after(Duration::from_millis(500)).await;
     }
 }
 
