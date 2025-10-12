@@ -5,3 +5,4 @@ pub mod state;
 pub mod wifi;
 pub mod mqtt;
 pub mod util;
+pub mod usb;

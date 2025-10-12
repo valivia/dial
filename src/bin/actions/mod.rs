@@ -1,3 +1,5 @@
+use usbd_hid::descriptor::KeyboardUsage;
+
 pub mod mqtt;
 pub mod usb;
 
@@ -28,24 +30,24 @@ pub static PAGES: [Page; 2] = [
     Page {
         actions: [
             Action::Usb(usb::Action {
-                trigger: usb::TriggerType::Toggle,
-                keycode: 0x68,
+                trigger: usb::TriggerType::Press,
+                keycode: KeyboardUsage::KeyboardF13 as u8,
+            }),
+            Action::Usb(usb::Action {
+                trigger: usb::TriggerType::Press,
+                keycode: KeyboardUsage::KeyboardF14 as u8,
+            }),
+            Action::Usb(usb::Action {
+                trigger: usb::TriggerType::Hold,
+                keycode: KeyboardUsage::KeyboardF15 as u8,
             }),
             Action::Usb(usb::Action {
                 trigger: usb::TriggerType::Toggle,
-                keycode: 0x69,
+                keycode: KeyboardUsage::KeyboardF15 as u8,
             }),
             Action::Usb(usb::Action {
-                trigger: usb::TriggerType::Toggle,
-                keycode: 0x6a,
-            }),
-            Action::Usb(usb::Action {
-                trigger: usb::TriggerType::Toggle,
-                keycode: 0x6b,
-            }),
-            Action::Usb(usb::Action {
-                trigger: usb::TriggerType::Toggle,
-                keycode: 0x6c,
+                trigger: usb::TriggerType::Hold,
+                keycode: KeyboardUsage::KeyboardAa as u8,
             }),
         ],
     },
