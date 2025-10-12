@@ -1,12 +1,17 @@
-use core::fmt::Write;
 use core::str::FromStr;
+use core::{fmt::Write, sync::atomic::Ordering};
 use defmt::{info, warn};
 use embassy_time::Duration;
 use heapless::String;
 
+use crate::modules::indicator::signals::{ACTION_SENT, MQTT_CONNECTION_ERROR};
+use crate::modules::usb::writer::USB_ACTION;
 use crate::{
     actions::{mqtt, usb, Action, PAGES},
-    modules::indicator::{set_indication, IndicatorAction},
+    modules::{
+        indicator::{set_indication, IndicatorAction},
+        mqtt::MQTTT_CONNECTION_ACTIVE,
+    },
 };
 
 use super::{
@@ -30,7 +35,6 @@ pub async fn state_task() {
 static PAGE_CHANGE_SIGNAL_DURATION: Duration = Duration::from_millis(200);
 
 pub struct StateManager {
-    // Index of PAGES (static sized array)
     current_page_index: usize,
 }
 
@@ -83,16 +87,17 @@ impl StateManager {
         let action = &page.actions[button.to_index()];
 
         match action {
-            Action::Mqtt(mqtt_action) => self.run_mqtt_action(mqtt_action, state),
-            Action::Usb(usb_action) => self.run_usb_action(usb_action),
+            Action::Mqtt(mqtt_action) => {
+                if state != ButtonState::Pressed {
+                    return;
+                }
+                self.run_mqtt_action(mqtt_action);
+            }
+            Action::Usb(usb_action) => self.run_usb_action(usb_action.clone(), state),
         }
     }
 
-    fn run_mqtt_action(&self, action: &mqtt::Action, state: ButtonState) {
-        if state != ButtonState::Pressed {
-            return;
-        }
-
+    fn run_mqtt_action(&self, action: &mqtt::Action) {
         let payload = match LAST_DIAL_COUNT.load() {
             Some(count) => {
                 let mut s = String::<32>::new();
@@ -106,10 +111,18 @@ impl StateManager {
         LAST_DIAL_COUNT.store(None);
         CANCEL_INDICATION.signal(());
 
+        if !MQTTT_CONNECTION_ACTIVE.load(Ordering::Relaxed) {
+            warn!("MQTT connection is not active, cannot send message");
+            set_indication(MQTT_CONNECTION_ERROR);
+            return;
+        }
+
         MQTT_SIGNAL.signal((String::<32>::from_str(action.topic).unwrap(), payload));
     }
 
-    fn run_usb_action(&self, action: &usb::Action) {
+    fn run_usb_action(&self, action: usb::Action, state: ButtonState) {
+        set_indication(ACTION_SENT);
         info!("Running USB action: {:?}", action.keycode);
+        USB_ACTION.signal((action, state));
     }
 }

@@ -9,12 +9,15 @@ use esp_hal::rng::Rng;
 use esp_hal::timer::timg::TimerGroup;
 use esp_println as _;
 use modules::buttons::button_task;
-use modules::buttons::service::ButtonServiceGpio;
 use modules::dial::dial_task;
 use modules::indicator::{indicator_task, set_indication, Indication, IndicatorAction};
 use modules::mqtt::mqtt_init;
 use modules::state::state_task;
 use modules::wifi::wifi_init;
+
+use crate::modules::buttons::service::ButtonService;
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 #[panic_handler]
 fn panic(_: &core::panic::PanicInfo) -> ! {
@@ -45,12 +48,15 @@ async fn main(spawner: Spawner) {
 
     // Buttons
     spawner
-        .spawn(button_task(ButtonServiceGpio {
-            data: peripherals.GPIO34.into(),
-            select_1: peripherals.GPIO36.into(),
-            select_2: peripherals.GPIO37.into(),
-            select_3: peripherals.GPIO35.into(),
-        }))
+        .spawn(button_task(
+            ButtonService::new(
+                peripherals.GPIO36,
+                peripherals.GPIO37,
+                peripherals.GPIO35,
+                peripherals.GPIO34,
+            )
+            .await,
+        ))
         .unwrap();
 
     // Dial
@@ -74,15 +80,17 @@ async fn main(spawner: Spawner) {
         right: Indication::SingleFire(Duration::from_secs(1)),
     });
 
+    // USB
+    spawner
+        .spawn(modules::usb::usb_init(
+            peripherals.USB0,
+            peripherals.GPIO20,
+            peripherals.GPIO19,
+        ))
+        .unwrap();
+
     // Wifi
-    let wifi_stack = wifi_init(
-        spawner,
-        peripherals.TIMG0,
-        peripherals.RADIO_CLK,
-        peripherals.WIFI,
-        rng.clone(),
-    )
-    .await;
+    let wifi_stack = wifi_init(spawner, peripherals.TIMG0, peripherals.WIFI, rng.clone()).await;
 
     // MQTT
     spawner.spawn(mqtt_init(wifi_stack)).ok();

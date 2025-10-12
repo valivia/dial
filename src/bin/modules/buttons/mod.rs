@@ -1,6 +1,6 @@
 use defmt::info;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
-use service::{ButtonService, ButtonServiceGpio};
+use service::ButtonService;
 
 pub mod service;
 
@@ -64,8 +64,7 @@ pub static BUTTON_SIGNAL: Signal<CriticalSectionRawMutex, (Button, ButtonState)>
 
 // Main task
 #[embassy_executor::task]
-pub async fn button_task(pins: ButtonServiceGpio) {
-    let mut button_service = ButtonService::new(pins).await;
+pub async fn button_task(mut button_service: ButtonService) {
     info!("Button service initialized");
 
     loop {

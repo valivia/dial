@@ -3,7 +3,7 @@ use core::sync::atomic::{AtomicU32, Ordering};
 use defmt::info;
 use embassy_futures::select::{select, Either};
 use embassy_time::{with_timeout, Duration, Instant, Timer};
-use esp_hal::gpio::{AnyPin, Event, Input, Pull};
+use esp_hal::gpio::{AnyPin, Event, Input, InputPin, Pull};
 
 use crate::modules::indicator::{set_indication, Indication, IndicatorAction};
 
@@ -11,7 +11,7 @@ use super::util::OptionalAtomicU8;
 
 // Task
 #[embassy_executor::task]
-pub async fn dial_task(mode: AnyPin, data: AnyPin) {
+pub async fn dial_task(mode: AnyPin<'static>, data: AnyPin<'static>) {
     let mut dial_service = DialService::new(mode, data);
 
     loop {
@@ -20,19 +20,18 @@ pub async fn dial_task(mode: AnyPin, data: AnyPin) {
 }
 
 // Service
-
 static MIN_TICK_DURATION: Duration = Duration::from_millis(85);
 pub static LAST_DIAL_COUNT: OptionalAtomicU8 = OptionalAtomicU8::new(None);
 pub static LAST_DIAL_COUNT_TIME: AtomicU32 = AtomicU32::new(0);
 static KEEP_COUNT_DURATION: Duration = Duration::from_secs(5);
 
-pub struct DialService<'a> {
-    mode_pin: Input<'a>,
-    data_pin: Input<'a>,
+pub struct DialService {
+    mode_pin: Input<'static>,
+    data_pin: Input<'static>,
 }
 
-impl<'a> DialService<'a> {
-    pub fn new(mode: AnyPin, data: AnyPin) -> Self {
+impl DialService {
+    pub fn new(mode: impl InputPin + 'static, data: impl InputPin + 'static) -> Self {
         let pin_cfg = esp_hal::gpio::InputConfig::default().with_pull(Pull::Up);
 
         let mut data_pin = Input::new(data, pin_cfg.clone());

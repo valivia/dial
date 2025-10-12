@@ -1,20 +1,19 @@
+use alloc::string::ToString;
 use defmt::info;
 use embassy_executor::Spawner;
 use embassy_net::{Runner, Stack, StackResources};
 use embassy_time::{Duration, Timer};
 use esp_alloc as _;
 use esp_hal::{
-    peripherals::{RADIO_CLK, TIMG0, WIFI},
+    peripherals::{TIMG0, WIFI},
     rng::Rng,
     timer::timg::TimerGroup,
 };
-use esp_println::println;
 use esp_wifi::{
     init,
     wifi::{ClientConfiguration, Configuration, WifiController, WifiDevice, WifiEvent, WifiState},
     EspWifiController,
 };
-use heapless::String;
 
 macro_rules! mk_static {
     ($t:ty,$val:expr) => {{
@@ -25,21 +24,22 @@ macro_rules! mk_static {
     }};
 }
 
+const TAG: &str = "[WIFI]";
+
 static WIFI_SSID: &str = env!("WIFI_SSID");
 static WIFI_PSK: &str = env!("WIFI_PASS");
 
 pub async fn wifi_init(
     spawner: Spawner,
-    timer1: TIMG0,
-    radio: RADIO_CLK,
-    wifi: WIFI,
+    timer1: TIMG0<'static>,
+    wifi: WIFI<'static>,
     mut rng: Rng,
 ) -> Stack<'static> {
     let timg0 = TimerGroup::new(timer1);
 
     let esp_wifi_ctrl = &*mk_static!(
         EspWifiController<'static>,
-        init(timg0.timer0, rng.clone(), radio).unwrap()
+        init(timg0.timer0, rng.clone()).unwrap()
     );
 
     let (controller, interfaces) = esp_wifi::wifi::new(&esp_wifi_ctrl, wifi).unwrap();
@@ -68,10 +68,10 @@ pub async fn wifi_init(
         Timer::after(Duration::from_millis(500)).await;
     }
 
-    println!("Waiting to get IP address...");
+    info!("{} Waiting to get IP address...", TAG);
     loop {
         if let Some(config) = stack.config_v4() {
-            println!("Got IP: {}", config.address);
+            info!("{} Got IP: {}", TAG, config.address);
             break;
         }
         Timer::after(Duration::from_millis(500)).await;
@@ -82,8 +82,8 @@ pub async fn wifi_init(
 
 #[embassy_executor::task]
 async fn connection(mut controller: WifiController<'static>) {
-    println!("start connection task");
-    println!("Device capabilities: {:?}", controller.capabilities());
+    info!("{} start connection task", TAG);
+
     loop {
         match esp_wifi::wifi::wifi_state() {
             WifiState::StaConnected => {
@@ -94,30 +94,30 @@ async fn connection(mut controller: WifiController<'static>) {
             _ => {}
         }
         if !matches!(controller.is_started(), Ok(true)) {
-            info!("Connecting to {} ({})", WIFI_SSID, WIFI_PSK);
+            info!("{} Connecting to {}", TAG, WIFI_SSID);
             let client_config = Configuration::Client(ClientConfiguration {
-                ssid: String::try_from(WIFI_SSID).unwrap(),
-                password: String::try_from(WIFI_PSK).unwrap(),
+                ssid: WIFI_SSID.to_string(),
+                password: WIFI_PSK.to_string(),
                 ..Default::default()
             });
             controller.set_configuration(&client_config).unwrap();
-            println!("Starting wifi");
+            info!("{} Starting wifi", TAG);
             controller.start_async().await.unwrap();
-            println!("Wifi started!");
+            info!("{} Wifi started!", TAG);
 
-            println!("Scan");
-            let (result, _) = controller.scan_n_async::<10>().await.unwrap();
+            info!("{} Scanning for networks...", TAG);
+            let access_points = controller.scan_n_async(10).await.unwrap();
 
-            for ap in result {
-                println!("{:?}", ap);
+            for ap in access_points {
+                info!("{:?}", ap);
             }
         }
-        println!("About to connect...");
+        info!("{} Connecting...", TAG);
 
         match controller.connect_async().await {
-            Ok(_) => println!("Wifi connected!"),
+            Ok(_) => info!("{} connected!", TAG),
             Err(e) => {
-                println!("Failed to connect to wifi: {e:?}");
+                info!("{} Failed to connect: {:?}", TAG, e);
                 Timer::after(Duration::from_millis(5000)).await
             }
         }

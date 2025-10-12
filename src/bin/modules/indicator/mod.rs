@@ -1,7 +1,10 @@
+use defmt::info;
 use embassy_futures::select::{select, Either};
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 use embassy_time::{Duration, Timer};
 use esp_hal::gpio::{AnyPin, Level, Output, OutputConfig};
+
+pub mod signals;
 
 pub struct LoopingIndication {
     pub time_on: Duration,
@@ -32,12 +35,16 @@ impl IndicatorAction {
 static CURRENT_INDICATION: Signal<CriticalSectionRawMutex, IndicatorAction> = Signal::new();
 pub static CANCEL_INDICATION: Signal<CriticalSectionRawMutex, ()> = Signal::new();
 
+const TAG: &str = "[INDICATOR]";
+
 #[embassy_executor::task]
-pub async fn indicator_task(left: AnyPin, right: AnyPin) {
+pub async fn indicator_task(left: AnyPin<'static>, right: AnyPin<'static>) {
     let config = OutputConfig::default();
 
     let mut left_indicator = Output::new(left, Level::Low, config);
     let mut right_indicator = Output::new(right, Level::Low, config);
+
+    info!("{} initialized", TAG);
 
     loop {
         let action = CURRENT_INDICATION.wait().await;

@@ -1,35 +1,33 @@
 use embassy_time::Timer;
-use esp_hal::gpio::{AnyPin, Input, InputConfig, Level, Output, OutputConfig, Pull};
+use esp_hal::gpio::{Input, InputConfig, InputPin, Level, Output, OutputConfig, OutputPin, Pull};
 
 use crate::modules::buttons::{ButtonState, BUTTON_SIGNAL};
 
 use super::Button;
 
-pub struct ButtonService<'a> {
-    select_pin_1: Output<'a>,
-    select_pin_2: Output<'a>,
-    select_pin_3: Output<'a>,
-    data_pin: Input<'a>,
+pub struct ButtonService {
+    select_pin_1: Output<'static>,
+    select_pin_2: Output<'static>,
+    select_pin_3: Output<'static>,
+    data_pin: Input<'static>,
 
     channel: usize,
 
     last_buttons_state: [bool; 8],
 }
 
-pub struct ButtonServiceGpio {
-    pub select_1: AnyPin,
-    pub select_2: AnyPin,
-    pub select_3: AnyPin,
-    pub data: AnyPin,
-}
+impl ButtonService {
+    pub async fn new(
+        select_1: impl OutputPin + 'static,
+        select_2: impl OutputPin + 'static,
+        select_3: impl OutputPin + 'static,
+        data: impl InputPin + 'static,
+    ) -> Self {
+        let select_pin_1 = Output::new(select_1, Level::High, OutputConfig::default());
+        let select_pin_2 = Output::new(select_2, Level::High, OutputConfig::default());
+        let select_pin_3 = Output::new(select_3, Level::High, OutputConfig::default());
 
-impl<'a> ButtonService<'a> {
-    pub async fn new(pins: ButtonServiceGpio) -> Self {
-        let select_pin_1 = Output::new(pins.select_1, Level::High, OutputConfig::default());
-        let select_pin_2 = Output::new(pins.select_2, Level::High, OutputConfig::default());
-        let select_pin_3 = Output::new(pins.select_3, Level::High, OutputConfig::default());
-
-        let data_pin = Input::new(pins.data, InputConfig::default().with_pull(Pull::Up));
+        let data_pin = Input::new(data, InputConfig::default().with_pull(Pull::Up));
 
         let mut button_service = ButtonService {
             select_pin_1,
@@ -64,7 +62,7 @@ impl<'a> ButtonService<'a> {
             self.last_buttons_state[self.channel] = is_pressed;
         }
 
-        self.channel = (self.channel + 1) % 8;
+        self.channel = (self.channel + 1) % 7;
     }
 
     fn set_channel(&mut self, channel: usize) {
