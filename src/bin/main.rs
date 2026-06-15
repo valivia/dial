@@ -71,7 +71,7 @@ async fn main(spawner: Spawner) {
     );
 
     // Dial
-    spawner.spawn(dial_task(peripherals.GPIO4.into(), peripherals.GPIO5.into()).unwrap());
+    spawner.spawn(dial_task(spawner, peripherals.GPIO4.into(), peripherals.GPIO5.into()).unwrap());
 
     // Indicators
     spawner.spawn(indicator_task(peripherals.GPIO21.into(), peripherals.GPIO2.into()).unwrap());

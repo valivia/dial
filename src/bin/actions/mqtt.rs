@@ -1,23 +1,61 @@
+pub struct DialOptions {
+    pub required: bool,
+}
+
+pub struct MapRangeOptions {
+    pub required: bool,
+
+    pub out_min: i32,
+    pub out_max: i32,
+}
+
+impl MapRangeOptions {
+    pub fn map_value(&self, value: u8) -> i32 {
+        let in_min = 1;
+        let in_max = 10;
+
+        let in_range = (in_max - in_min) as i64;
+        let out_range = (self.out_max - self.out_min) as i64;
+        let value_offset = (value - in_min) as i64;
+
+        let mapped = value_offset * out_range / in_range + self.out_min as i64;
+        mapped as i32
+    }
+}
+
+pub struct MapValuesOptions {
+    pub required: bool,
+    pub values: &'static [(u32, &'static str)],
+}
+
+pub enum DialMode {
+    None,
+    Normal(DialOptions),
+    MapRange(MapRangeOptions),
+    MapValues(MapValuesOptions),
+}
+
 pub struct Action {
-    pub min: u32,
-    pub max: u32,
-    pub dial_required: bool,
-    pub topic: &'static str
+    pub dial: DialMode,
+    pub topic: &'static str,
 }
 
 impl Action {
     pub const fn new(topic: &'static str) -> Self {
         Self {
-            min: 10,
-            max: 100,
-            dial_required: false,
+            dial: DialMode::Normal(DialOptions { required: false }),
             topic,
         }
     }
 
-    pub fn map_value(&self, value: u8) -> u8 {
-        let range = self.max - self.min;
-        let mapped_value = ((value as u32 * range) / 10) + self.min;
-        mapped_value as u8
+    pub const fn new_lamp_control(topic: &'static str) -> Self {
+        Self {
+            dial: DialMode::MapRange(MapRangeOptions {
+                required: false,
+                out_min: 10,
+                out_max: 100,
+            }),
+            topic,
+        }
     }
 }

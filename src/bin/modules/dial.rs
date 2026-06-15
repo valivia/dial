@@ -1,8 +1,9 @@
 use core::sync::atomic::{AtomicU32, Ordering};
 
-use defmt::info;
-use embassy_executor::SendSpawner;
+use defmt::{debug, info};
+use embassy_executor::Spawner;
 use embassy_futures::select::{Either, select};
+use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 use embassy_time::{Duration, Instant, Timer, with_timeout};
 use esp_hal::gpio::{AnyPin, Event, Input, InputPin, Pull};
 
@@ -14,8 +15,10 @@ const TAG: &str = "[DIAL]";
 
 // Task
 #[embassy_executor::task]
-pub async fn dial_task(mode: AnyPin<'static>, data: AnyPin<'static>) {
+pub async fn dial_task(spawner: Spawner, mode: AnyPin<'static>, data: AnyPin<'static>) {
     let mut dial_service = DialService::new(mode, data);
+
+    spawner.spawn(dial_timeout_task().unwrap());
 
     loop {
         dial_service.run_loop().await;
@@ -27,6 +30,8 @@ static MIN_TICK_DURATION: Duration = Duration::from_millis(85);
 pub static LAST_DIAL_COUNT: OptionalAtomicU8 = OptionalAtomicU8::new(None);
 pub static LAST_DIAL_COUNT_TIME: AtomicU32 = AtomicU32::new(0);
 static KEEP_COUNT_DURATION: Duration = Duration::from_secs(5);
+
+pub static DIAL_END_SIGNAL: Signal<CriticalSectionRawMutex, u32> = Signal::new();
 
 pub struct DialService {
     mode_pin: Input<'static>,
@@ -66,7 +71,7 @@ impl DialService {
                 Either::First(_) => {
                     let elapsed = last_count.elapsed();
                     if elapsed < MIN_TICK_DURATION {
-                        info!(
+                        debug!(
                             "{} Registered edge but too fast ({} ms)",
                             TAG,
                             elapsed.as_millis()
@@ -74,6 +79,7 @@ impl DialService {
                         continue;
                     }
 
+                    // Limit to 10
                     if count == 10 {
                         break;
                     }
@@ -105,10 +111,8 @@ impl DialService {
                 right: Indication::None,
             });
 
-            // reset dial count after 5 seconds without blocking this loop
-            SendSpawner::for_current_executor()
-                .await
-                .spawn(reset_dial_count_after_delay(now).unwrap());
+            // reset dial count after X seconds
+            DIAL_END_SIGNAL.signal(now);
         } else {
             LAST_DIAL_COUNT.store(None);
         }
@@ -116,14 +120,17 @@ impl DialService {
 }
 
 #[embassy_executor::task]
-async fn reset_dial_count_after_delay(time: u32) {
-    Timer::after(KEEP_COUNT_DURATION).await;
+async fn dial_timeout_task() {
+    loop {
+        let time = DIAL_END_SIGNAL.wait().await;
+        Timer::after(KEEP_COUNT_DURATION).await;
 
-    if LAST_DIAL_COUNT_TIME.load(Ordering::SeqCst) != time {
-        info!("{} Cancelled dial count reset due to new event", TAG);
-        return;
+        if LAST_DIAL_COUNT_TIME.load(Ordering::SeqCst) != time {
+            debug!("{} Cancelled dial count reset due to new event", TAG);
+            return;
+        }
+
+        LAST_DIAL_COUNT.store(None);
+        debug!("{} Count reset after timeout", TAG);
     }
-
-    LAST_DIAL_COUNT.store(None);
-    info!("{} Count reset after timeout", TAG);
 }

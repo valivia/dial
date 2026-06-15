@@ -4,6 +4,7 @@ use defmt::{info, warn};
 use embassy_time::Duration;
 use heapless::String;
 
+use crate::actions::mqtt::DialMode;
 use crate::modules::indicator::signals::{ACTION_SENT, MQTT_CONNECTION_ERROR};
 use crate::modules::usb::writer::USB_ACTION;
 use crate::{
@@ -35,6 +36,14 @@ pub async fn state_task() {
 }
 
 static PAGE_CHANGE_SIGNAL_DURATION: Duration = Duration::from_millis(200);
+
+#[derive(Debug, defmt::Format)]
+pub enum ActionFailReason {
+    NotDefined,
+    MissingValue,
+    InvalidValue,
+    ServiceInactive,
+}
 
 pub struct StateManager {
     current_page_index: usize,
@@ -88,38 +97,84 @@ impl StateManager {
         let page = &PAGES[self.current_page_index];
         let action = &page.actions[button.to_index()];
 
-        match action {
+        if let Err(error) = match action {
+            Action::None => Err(ActionFailReason::NotDefined),
             Action::Mqtt(mqtt_action) => {
                 if state != ButtonState::Pressed {
                     return;
                 }
-                self.run_mqtt_action(mqtt_action);
+                self.run_mqtt_action(mqtt_action)
             }
-            Action::Usb(usb_action) => self.run_usb_action(usb_action.clone(), state),
+            Action::Usb(usb_action) => Ok(self.run_usb_action(usb_action.clone(), state)),
+        } {
+            warn!("{} Action failed, {:?}", TAG, error)
         }
     }
 
-    fn run_mqtt_action(&self, action: &mqtt::Action) {
-        let payload = match LAST_DIAL_COUNT.load() {
-            Some(count) => {
-                let mut s = String::<32>::new();
-                write!(s, "{}", action.map_value(count)).unwrap();
-                s
-            }
-            None => String::from_str("").unwrap(),
-        };
+    fn run_mqtt_action(&self, action: &mqtt::Action) -> Result<(), ActionFailReason> {
+        let count = LAST_DIAL_COUNT.load();
 
         // Reset the dial count
         LAST_DIAL_COUNT.store(None);
         CANCEL_INDICATION.signal(());
 
+        let payload: String<32> = match &action.dial {
+            DialMode::None => String::from_str("").unwrap(),
+            DialMode::Normal(options) => match count {
+                Some(c) => {
+                    let mut s: String<32> = String::new();
+                    write!(s, "{}", c).ok();
+                    s
+                }
+                None => {
+                    if options.required {
+                        return Err(ActionFailReason::MissingValue);
+                    }
+                    String::from_str("").unwrap()
+                }
+            },
+
+            DialMode::MapRange(options) => match count {
+                Some(c) => {
+                    let mapped = options.map_value(c);
+                    let mut s: String<32> = String::new();
+                    write!(s, "{:.2}", mapped).ok();
+                    s
+                }
+                None => {
+                    if options.required {
+                        return Err(ActionFailReason::MissingValue);
+                    }
+                    String::from_str("").unwrap()
+                }
+            },
+            DialMode::MapValues(options) => match count {
+                Some(c) => match options.values.iter().find(|entry| entry.0 == c as u32) {
+                    Some(entry) => String::from_str(entry.1).unwrap(),
+                    None => {
+                        if options.required {
+                            return Err(ActionFailReason::InvalidValue);
+                        }
+                        String::from_str("").unwrap()
+                    }
+                },
+                None => {
+                    if options.required {
+                        return Err(ActionFailReason::MissingValue);
+                    }
+                    String::from_str("").unwrap()
+                }
+            },
+        };
+
         if !MQTTT_CONNECTION_ACTIVE.load(Ordering::Relaxed) {
-            warn!("{} MQTT connection is not active, cannot send message", TAG);
             set_indication(MQTT_CONNECTION_ERROR);
-            return;
+            return Err(ActionFailReason::ServiceInactive);
         }
 
         MQTT_SIGNAL.signal((String::<32>::from_str(action.topic).unwrap(), payload));
+
+        Ok(())
     }
 
     fn run_usb_action(&self, action: usb::Action, state: ButtonState) {

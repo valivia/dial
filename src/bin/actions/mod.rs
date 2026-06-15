@@ -1,9 +1,12 @@
 use usbd_hid::descriptor::KeyboardUsage;
 
+use crate::actions::mqtt::MapValuesOptions;
+
 pub mod mqtt;
 pub mod usb;
 
 pub enum Action {
+    None,
     Mqtt(mqtt::Action),
     Usb(usb::Action),
 }
@@ -12,19 +15,14 @@ pub struct Page {
     pub actions: [Action; 5],
 }
 
-pub static PAGES: [Page; 2] = [
+pub static PAGES: [Page; 3] = [
     Page {
         actions: [
-            Action::Mqtt(mqtt::Action::new("phone/button/btn0")),
-            Action::Mqtt(mqtt::Action::new("phone/button/btn1")),
-            Action::Mqtt(mqtt::Action::new("phone/button/btn2")),
+            Action::Mqtt(mqtt::Action::new_lamp_control("phone/button/btn0")),
+            Action::Mqtt(mqtt::Action::new_lamp_control("phone/button/btn1")),
+            Action::Mqtt(mqtt::Action::new_lamp_control("phone/button/btn2")),
+            Action::Mqtt(mqtt::Action::new_lamp_control("phone/button/btn3")),
             Action::Mqtt(mqtt::Action::new("phone/button/btn3")),
-            Action::Mqtt(mqtt::Action {
-                min: 0,
-                max: 10,
-                dial_required: false,
-                topic: "phone/button/btn4",
-            }),
         ],
     },
     Page {
@@ -49,6 +47,29 @@ pub static PAGES: [Page; 2] = [
                 trigger: usb::TriggerType::Hold,
                 keycode: KeyboardUsage::KeyboardAa as u8,
             }),
+        ],
+    },
+    Page {
+        actions: [
+            Action::Mqtt(mqtt::Action {
+                topic: "owlimatronic/event",
+                dial: mqtt::DialMode::MapValues(MapValuesOptions {
+                    required: true,
+                    values: &[
+                        (1, "yap"),
+                        (2, "test"),
+                        (3, "hello"),
+                        (4, "shocked"),
+                        (5, "pick_up"),
+                        (6, "panic"),
+                        (7, "sweep"),
+                    ],
+                }),
+            }),
+            Action::None,
+            Action::None,
+            Action::None,
+            Action::None,
         ],
     },
 ];
