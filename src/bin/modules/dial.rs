@@ -1,13 +1,16 @@
 use core::sync::atomic::{AtomicU32, Ordering};
 
 use defmt::info;
-use embassy_futures::select::{select, Either};
-use embassy_time::{with_timeout, Duration, Instant, Timer};
+use embassy_executor::SendSpawner;
+use embassy_futures::select::{Either, select};
+use embassy_time::{Duration, Instant, Timer, with_timeout};
 use esp_hal::gpio::{AnyPin, Event, Input, InputPin, Pull};
 
-use crate::modules::indicator::{set_indication, Indication, IndicatorAction};
+use crate::modules::indicator::{Indication, IndicatorAction, set_indication};
 
 use super::util::OptionalAtomicU8;
+
+const TAG: &str = "[DIAL]";
 
 // Task
 #[embassy_executor::task]
@@ -51,7 +54,7 @@ impl DialService {
         self.mode_pin.wait_for_falling_edge().await;
         let mut count: u8 = 0;
         let mut last_count = Instant::now();
-        info!("dial start");
+        info!("{} Started dialing", TAG);
 
         loop {
             match select(
@@ -63,7 +66,11 @@ impl DialService {
                 Either::First(_) => {
                     let elapsed = last_count.elapsed();
                     if elapsed < MIN_TICK_DURATION {
-                        info!("Registered edge but too fast ({} ms)", elapsed.as_millis());
+                        info!(
+                            "{} Registered edge but too fast ({} ms)",
+                            TAG,
+                            elapsed.as_millis()
+                        );
                         continue;
                     }
 
@@ -77,7 +84,7 @@ impl DialService {
                 Either::Second(_) => {
                     Timer::after_millis(1).await;
                     if self.mode_pin.is_low() {
-                        info!("Dial mode bounced");
+                        info!("{} Mode bounced", TAG);
                         continue;
                     }
                     break;
@@ -85,9 +92,10 @@ impl DialService {
             }
         }
 
+        info!("{} Stopped dialing, count: {}", TAG, count);
+
         if count > 0 {
             LAST_DIAL_COUNT.store(Some(count));
-            info!("Dial ended, count: {}", count);
 
             let now = Instant::now().as_secs() as u32;
 
@@ -98,13 +106,11 @@ impl DialService {
             });
 
             // reset dial count after 5 seconds without blocking this loop
-            embassy_executor::Spawner::for_current_executor()
+            SendSpawner::for_current_executor()
                 .await
-                .spawn(reset_dial_count_after_delay(now))
-                .ok();
+                .spawn(reset_dial_count_after_delay(now).unwrap());
         } else {
             LAST_DIAL_COUNT.store(None);
-            info!("Dial ended, count: None");
         }
     }
 }
@@ -114,10 +120,10 @@ async fn reset_dial_count_after_delay(time: u32) {
     Timer::after(KEEP_COUNT_DURATION).await;
 
     if LAST_DIAL_COUNT_TIME.load(Ordering::SeqCst) != time {
-        info!("Cancelled dial count reset due to new event");
+        info!("{} Cancelled dial count reset due to new event", TAG);
         return;
     }
 
     LAST_DIAL_COUNT.store(None);
-    info!("Dial count reset after timeout");
+    info!("{} Count reset after timeout", TAG);
 }

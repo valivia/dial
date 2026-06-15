@@ -4,17 +4,17 @@ pub mod writer;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use defmt::info;
-use embassy_executor::Spawner;
+use embassy_executor::SendSpawner;
 use embassy_usb::{
-    class::hid::{HidReaderWriter, State},
     Builder, Handler,
+    class::hid::{HidBootProtocol, HidReaderWriter, HidSubclass, State},
 };
 use esp_hal::{
     otg_fs::asynch::Config,
     peripherals::{GPIO19, GPIO20},
 };
 use esp_hal::{
-    otg_fs::{asynch::Driver, Usb},
+    otg_fs::{Usb, asynch::Driver},
     peripherals::USB0,
 };
 
@@ -22,6 +22,8 @@ use static_cell::StaticCell;
 use usbd_hid::descriptor::{KeyboardReport, SerializedDescriptor};
 
 use crate::modules::usb::{reader::usb_reader_task, writer::usb_writer_task};
+
+const TAG: &str = "[USB]";
 
 // Static buffers
 static EP_OUT_BUFFER: StaticCell<[u8; 1024]> = StaticCell::new();
@@ -74,6 +76,8 @@ pub async fn usb_init(usb0: USB0<'static>, dp_pin: GPIO20<'static>, dm_pin: GPIO
     builder.handler(device_handler);
 
     let config = embassy_usb::class::hid::Config {
+        hid_boot_protocol: HidBootProtocol::Keyboard,
+        hid_subclass: HidSubclass::No,
         report_descriptor: KeyboardReport::desc(),
         request_handler: None,
         poll_ms: 60,
@@ -88,10 +92,9 @@ pub async fn usb_init(usb0: USB0<'static>, dp_pin: GPIO20<'static>, dm_pin: GPIO
 
     let (reader, writer) = hid.split();
 
-    let spawner = Spawner::for_current_executor().await;
-
-    spawner.spawn(usb_writer_task(writer)).unwrap();
-    spawner.spawn(usb_reader_task(reader)).unwrap();
+    let spawner = SendSpawner::for_current_executor().await;
+    spawner.spawn(usb_writer_task(writer).unwrap());
+    spawner.spawn(usb_reader_task(reader).unwrap());
 
     usb_fut.await;
 }
@@ -112,30 +115,34 @@ impl Handler for MyDeviceHandler {
     fn enabled(&mut self, enabled: bool) {
         self.configured.store(false, Ordering::Relaxed);
         if enabled {
-            info!("Device enabled");
+            info!("{} Device enabled", TAG);
         } else {
-            info!("Device disabled");
+            info!("{} Device disabled", TAG);
         }
     }
 
     fn reset(&mut self) {
         self.configured.store(false, Ordering::Relaxed);
-        info!("Bus reset, the Vbus current limit is 100mA");
+        info!("{} Bus reset, the Vbus current limit is 100mA", TAG);
     }
 
     fn addressed(&mut self, addr: u8) {
         self.configured.store(false, Ordering::Relaxed);
-        info!("USB address set to: {}", addr);
+        info!("{} USB address set to: {}", TAG, addr);
     }
 
     fn configured(&mut self, configured: bool) {
         self.configured.store(configured, Ordering::Relaxed);
         if configured {
             info!(
-                "Device configured, it may now draw up to the configured current limit from Vbus."
+                "{} Device configured, it may now draw up to the configured current limit from Vbus.",
+                TAG
             )
         } else {
-            info!("Device is no longer configured, the Vbus current limit is 100mA.");
+            info!(
+                "{} Device is no longer configured, the Vbus current limit is 100mA.",
+                TAG
+            );
         }
     }
 }

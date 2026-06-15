@@ -7,24 +7,26 @@ use heapless::String;
 use crate::modules::indicator::signals::{ACTION_SENT, MQTT_CONNECTION_ERROR};
 use crate::modules::usb::writer::USB_ACTION;
 use crate::{
-    actions::{mqtt, usb, Action, PAGES},
+    actions::{Action, PAGES, mqtt, usb},
     modules::{
-        indicator::{set_indication, IndicatorAction},
+        indicator::{IndicatorAction, set_indication},
         mqtt::MQTTT_CONNECTION_ACTIVE,
     },
 };
 
 use super::{
-    buttons::{Button, ButtonState, BUTTON_SIGNAL},
+    buttons::{BUTTON_SIGNAL, Button, ButtonState},
     dial::LAST_DIAL_COUNT,
     indicator::CANCEL_INDICATION,
     mqtt::MQTT_SIGNAL,
 };
 
+const TAG: &str = "[STATE]";
+
 #[embassy_executor::task]
 pub async fn state_task() {
     let mut state_manager = StateManager::new();
-    info!("State manager initialized");
+    info!("{} Initialized", TAG);
 
     loop {
         let (button, state) = BUTTON_SIGNAL.wait().await;
@@ -74,12 +76,12 @@ impl StateManager {
                 (self.current_page_index + page_count - 1) % page_count
             }
             _ => {
-                warn!("Ignored non-page button: {:?}", button);
+                warn!("{} Ignored non-page button: {:?}", TAG, button);
                 return;
             }
         };
 
-        info!("Page changed to {}", self.current_page_index);
+        info!("{} Page changed to {}", TAG, self.current_page_index);
     }
 
     fn handle_button_event(&mut self, button: Button, state: ButtonState) {
@@ -112,7 +114,7 @@ impl StateManager {
         CANCEL_INDICATION.signal(());
 
         if !MQTTT_CONNECTION_ACTIVE.load(Ordering::Relaxed) {
-            warn!("MQTT connection is not active, cannot send message");
+            warn!("{} MQTT connection is not active, cannot send message", TAG);
             set_indication(MQTT_CONNECTION_ERROR);
             return;
         }
@@ -122,7 +124,7 @@ impl StateManager {
 
     fn run_usb_action(&self, action: usb::Action, state: ButtonState) {
         set_indication(ACTION_SENT);
-        info!("Running USB action: {:?}", action.keycode);
+        info!("{} Running USB action: {:?}", TAG, action.keycode);
         USB_ACTION.signal((action, state));
     }
 }

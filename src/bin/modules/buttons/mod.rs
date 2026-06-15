@@ -4,6 +4,8 @@ use service::ButtonService;
 
 pub mod service;
 
+const TAG: &str = "[BUTTON]";
+
 // Button
 #[derive(Clone, Copy, PartialEq, defmt::Format)]
 pub enum Button {
@@ -65,7 +67,7 @@ pub static BUTTON_SIGNAL: Signal<CriticalSectionRawMutex, (Button, ButtonState)>
 // Main task
 #[embassy_executor::task]
 pub async fn button_task(mut button_service: ButtonService) {
-    info!("Button service initialized");
+    info!("{} Initialized", TAG);
 
     loop {
         button_service.run_loop().await;

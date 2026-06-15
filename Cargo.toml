@@ -1,7 +1,8 @@
 [package]
-edition = "2021"
+edition = "2024"
 name = "dial"
 authors = ["Owlive"]
+rust-version = "1.88"
 version = "1.0.0"
 
 [[bin]]
@@ -9,42 +10,41 @@ name = "dial"
 path = "./src/bin/main.rs"
 
 [dependencies]
-defmt = "1.0.1"
-esp-bootloader-esp-idf = { version = "0.2.0", features = ["esp32s3"] }
-esp-hal = { version = "=1.0.0-rc.0", features = [
+esp-hal = { version = "~1.1.0", features = ["defmt", "esp32s3", "unstable"] }
+
+esp-rtos = { version = "0.3.0", features = [
   "defmt",
+  "embassy",
+  "esp-alloc",
+  "esp-radio",
   "esp32s3",
-  "unstable",
 ] }
 
-embassy-net = { version = "0.7.0", features = [
+defmt                  = "1.0.1"
+esp-bootloader-esp-idf = { version = "0.5.0", features = ["defmt", "esp32s3"] }
+
+embassy-net = { version = "0.9.1", features = [
   "defmt",
   "dhcpv4",
   "medium-ethernet",
   "tcp",
   "udp",
 ] }
-embedded-io = { version = "0.6.1", features = ["defmt-03"] }
-embedded-io-async = { version = "0.6.1", features = ["defmt-03"] }
-esp-alloc = { version = "0.8.0", features = ["defmt"] }
-esp-println = { version = "0.15.0", features = ["defmt-espflash", "esp32s3"] }
+embedded-io = { version = "0.7.1", features = ["defmt"] }
+embedded-io-async = { version = "0.7.0", features = ["defmt"] }
+esp-alloc = { version = "0.10.0", features = ["defmt"] }
+esp-println = { version = "0.17.0", features = ["defmt-espflash", "esp32s3"] }
 # for more networking protocol support see https://crates.io/crates/edge-net
-critical-section = "1.2.0"
-embassy-executor = { version = "0.7.0", features = [
-  "defmt",
-  "task-arena-size-20480",
-] }
+embassy-executor = { version = "0.10.0", features = ["defmt"] }
 embassy-time = { version = "0.5.0", features = ["defmt"] }
-esp-hal-embassy = { version = "0.9.0", features = ["defmt", "esp32s3"] }
-esp-wifi = { version = "0.15.0", features = [
-  "builtin-scheduler",
+esp-radio = { version = "0.18.0", features = [
   "defmt",
   "esp-alloc",
   "esp32s3",
-  "smoltcp",
+  "unstable",
   "wifi",
 ] }
-smoltcp = { version = "0.12.0", default-features = false, features = [
+smoltcp = { version = "0.13.0", default-features = false, features = [
   "defmt",
   "medium-ethernet",
   "multicast",
@@ -57,16 +57,16 @@ smoltcp = { version = "0.12.0", default-features = false, features = [
   "socket-tcp",
   "socket-udp",
 ] }
-static_cell = "2.1.1"
-rust-mqtt = { version = "0.3.0", default-features = false, features = [
-  "no_std",
-  "defmt",
-] }
-embassy-sync = { version = "0.7.2", features = ["defmt"] }
+
+critical-section = "1.2.0"
+static_cell      = "2.1.1"
+
+rust-mqtt = { version = "0.5.1", default-features = false, features = ["v5", "bump", "defmt"] }
+embassy-sync = { version = "0.8.0", features = ["defmt"] }
 embassy-futures = { version = "0.1.2", features = ["defmt"] }
-heapless = { version = "0.9.1", features = ["defmt"] }
-embassy-usb = { version = "0.4.0", features = ["defmt"] }
-usbd-hid = "0.8.2"
+heapless = { version = "0.9.3", features = ["defmt"] }
+embassy-usb = { version = "0.6.0", features = ["defmt"] }
+usbd-hid = "0.10.0"
 
 [profile.dev]
 # Rust debug is too slow.
@@ -74,10 +74,7 @@ usbd-hid = "0.8.2"
 opt-level = "s"
 
 [profile.release]
-codegen-units = 1        # LLVM can perform better optimizations using a single thread
-debug = 2
-debug-assertions = false
-incremental = false
-lto = 'fat'
-opt-level = 's'
-overflow-checks = false
+codegen-units = 1     # LLVM can perform better optimizations using a single thread
+debug         = 2     # prefer slower builds but better debugging experience
+lto           = 'fat'
+opt-level     = 's'
